@@ -28,3 +28,179 @@ glimpse(energy_rq1)
 
 -   Outcome variable (include the name/description and type of variable):
     -   `carbon_intensity_elec` **(continuous)**：measures the amount of carbon dioxide emitted per unit of electricity generated (grams of CO₂ per kilowatt-hour). It captures how carbon-efficient a country’s electricity production is — lower values indicate cleaner, more renewable-based power systems.
+
+```{r}
+head(energy_rq1, 5)
+```
+
+```         
+```
+
+Because the OWID Energy dataset does not include income classifications, we merged it with a separate World Bank income-group dataset (from same source) that provides each country’s income level by year. This merge, done using country name and year, allows us to include income group as a key predictor and test whether the GDP–carbon-intensity relationship differs across income categories.
+
+```{r}
+income <- read.csv(
+  "https://raw.githubusercontent.com/owid/owid-datasets/master/datasets/Country%20Income%20Classification%20-%20World%20Bank%20(2017)/Country%20Income%20Classification%20-%20World%20Bank%20(2017).csv"
+)
+head(income, 5)
+```
+
+```{r}
+income <- income %>%
+  rename(
+    country = Entity,
+    income_code = Income.classification..World.Bank.2017.,
+    year = Year
+  )
+
+income <- income %>%
+  mutate(income_group = case_when(
+    income_code == 4 ~ "High income",
+    income_code == 3 ~ "Upper middle income",
+    income_code == 2 ~ "Lower middle income",
+    income_code == 1 ~ "Low income"
+  ))
+
+
+```
+
+```{r}
+energy_income <- energy_rq1 %>%
+  left_join(income, by = c("country", "year"))
+
+head(energy_income)
+```
+
+## Clean Data 
+
+```{r}
+library(dplyr)
+
+cleaned <- energy_income %>%
+  filter(
+    !is.na(carbon_intensity_elec),
+    !is.na(gdp_per_capita),
+    !is.na(income_group)
+  ) %>%
+  mutate(
+    log_gdp = log(gdp_per_capita),
+    income_group = factor(income_group)   # ensure categorical
+  )
+
+cleaned$income_group <- factor(cleaned$income_group,
+                               levels = c("Low income",
+                                          "Lower middle income",
+                                          "Upper middle income",
+                                          "High income"))
+
+
+head(cleaned)
+```
+
+## EDA
+
+```{r}
+library(ggplot2)
+
+ggplot(cleaned, aes(x = gdp_per_capita)) +
+  geom_histogram(bins = 50, fill = "steelblue", color = "white") +
+  scale_x_continuous(labels = scales::comma) +
+  labs(
+    title = "Distribution of GDP per Capita (Raw)",
+    x = "GDP per capita",
+    y = "Count"
+  )
+
+
+ggplot(cleaned, aes(x = log_gdp)) +
+  geom_histogram(bins = 50, fill = "darkgreen", color = "white") +
+  labs(
+    title = "Distribution of Log(GDP per Capita)",
+    x = "log(GDP per capita)",
+    y = "Count"
+  )
+
+```
+
+```{r}
+ggplot(cleaned, aes(x = gdp_per_capita, y = carbon_intensity_elec)) +
+  geom_point(alpha = 0.3) +
+  scale_x_continuous(labels = scales::comma) +
+  labs(
+    title = "Carbon Intensity vs GDP per Capita (Raw)",
+    x = "GDP per capita",
+    y = "Carbon intensity of electricity (gCO₂/kWh)"
+  )
+
+ggplot(cleaned, aes(x = log_gdp, y = carbon_intensity_elec)) +
+  geom_point(alpha = 0.3) +
+  labs(
+    title = "Carbon Intensity vs Log(GDP per Capita)",
+    x = "log(GDP per capita)",
+    y = "Carbon intensity of electricity (gCO₂/kWh)"
+  )
+
+```
+
+In the histogram, GDP per capita is extremely right-skewed, with most countries clustered at low values and a long tail of very high-income countries. Log-transforming GDP produces a more symmetric distribution appropriate for linear modeling. In the scatter plot, the relationship between GDP and carbon intensity is curved and compresses most observations into a narrow region at low GDP levels. Using log(GDP) spreads the data more evenly and produces a clearer, more linear relationship suitable for regression.
+
+Does GDP per capita affect carbon intensity, and does this relationship differ by income group?
+
+This model requires an interaction term.
+
+```{r}
+model <- lm(
+  carbon_intensity_elec ~ log_gdp * income_group,
+  data = cleaned
+)
+
+summary(model)
+confint(model)
+
+```
+
+```{r}
+coefs <- coef(model)
+
+#  Low income  (reference)
+slope_low <- coefs["log_gdp"]
+
+# Lower middle income
+slope_lower_middle <- coefs["log_gdp"] +
+  coefs["log_gdp:income_groupLower middle income"]
+
+# Upper middle income
+slope_upper_middle <- coefs["log_gdp"] +
+  coefs["log_gdp:income_groupUpper middle income"]
+
+# High income
+slope_high <- coefs["log_gdp"] +
+  coefs["log_gdp:income_groupHigh income"]
+
+c(slope_low, slope_lower_middle, slope_upper_middle, slope_high)
+
+
+
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(cleaned, aes(x = log_gdp, y = carbon_intensity_elec, color = income_group)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Carbon Intensity of Electricity vs GDP per Capita",
+    subtitle = "Interaction between GDP per capita and income group",
+    x = "Log GDP per capita",
+    y = "Carbon intensity of electricity (gCO₂/kWh)"
+  )
+```
+
+```{r}
+plot(model)
+```
+
+```{r}
+confint(model)
+```
