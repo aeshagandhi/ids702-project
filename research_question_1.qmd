@@ -71,7 +71,7 @@ energy_income <- energy_rq1 %>%
 head(energy_income)
 ```
 
-## Clean Data 
+## Clean Data
 
 ```{r}
 library(dplyr)
@@ -95,6 +95,9 @@ cleaned$income_group <- factor(cleaned$income_group,
 
 
 head(cleaned)
+```
+
+```{}
 ```
 
 ## EDA
@@ -144,9 +147,48 @@ ggplot(cleaned, aes(x = log_gdp, y = carbon_intensity_elec)) +
 
 In the histogram, GDP per capita is extremely right-skewed, with most countries clustered at low values and a long tail of very high-income countries. Log-transforming GDP produces a more symmetric distribution appropriate for linear modeling. In the scatter plot, the relationship between GDP and carbon intensity is curved and compresses most observations into a narrow region at low GDP levels. Using log(GDP) spreads the data more evenly and produces a clearer, more linear relationship suitable for regression.
 
+```         
+```
+
 Does GDP per capita affect carbon intensity, and does this relationship differ by income group?
 
 This model requires an interaction term.
+
+$$
+CI_i = \beta_0 + + \beta_1 \, GDPpc_i+ \beta_2 \, IncomeGroup_i+ \beta_3 \, GDPpc_i \times IncomeGroup_i+ \varepsilon_i.
+$$
+
+```{r}
+# basic raw model
+raw_model <- lm(
+  carbon_intensity_elec ~ gdp_per_capita * income_group,
+  data = cleaned
+)
+
+summary(raw_model)
+confint(raw_model)
+plot(raw_model)
+```
+
+This raw model treats GDP per capita as a linear, untransformed, and evenly spaced continuous variable. As hinted in the EDA, this may be problematic due to the following observations:
+
+-   GDP per capita is very right skewed. Most countries have a very low GDP and a few have extremely high GDP.
+
+-   The scatterplot with raw GDP from earlier shows a curved, nonlinear pattern, while the model tries to force that curvature into a straight line.
+
+How this affects the results?
+
+The raw model forces linearity such that:
+
+-   All income groups have a positive main effect of GDP increasing carbon intensity.
+
+-   GDP is skewed so that small numeric changes at the low end represent tiny economic differences while numeric changes at the high end represent huge jumps in wealth. Thus, the slopes could be distorted and not represent true relationships.
+
+Diagnostics
+
+-   Heteroskedasticity observed by fan shape in Residuals vs Fitted plot
+
+-   Curvature in Residuals vs Fitted suggesting linearity violated.
 
 ```{r}
 model <- lm(
@@ -204,3 +246,47 @@ plot(model)
 ```{r}
 confint(model)
 ```
+
+The model we fit is:
+
+$$
+CI_i = \beta_0 + + \beta_1 \, \log(GDPpc_i)+ \beta_2 \, IncomeGroup_i+ \beta_3 \, [\log(GDPpc_i) \times IncomeGroup_i]+ \varepsilon_i.
+$$
+
+The use of an **interaction term** allows the slope of GDP per capita to differ across income groups, which is essential for answering whether economic development operates differently in richer vs. poorer countries.
+
+Model Interpretation
+
+When holding all other variables constant:
+
+-   For **low-income countries**, a **one-unit increase in log(GDP per capita)** is associated with an **increase of 104.75 gCO₂/kWh** in carbon intensity, holding income group constant. This means that in low-income countries, economic growth corresponds to **more carbon-intensive electricity**.
+
+-   Holding log(GDP per capita) constant, **lower-middle-income countries** have carbon intensity values that are **262.54 gCO₂/kWh higher** on average than **low-income countries**, but the difference is **not statistically significant**.
+
+-   Holding log(GDP per capita) constant, **upper-middle-income countries** have carbon intensity values that are **178.96 gCO₂/kWh higher** on average than **low-income countries**, but this difference is **not statistically significant**.
+
+-   Holding log(GDP per capita) constant, **high-income countries** have carbon intensity levels that are **1,722.88 gCO₂/kWh higher** than **low-income countries**, and this difference **is statistically significant**. This reflects major structural differences in electricity systems across income levels.
+
+-   Compared to low-income countries, the slope relating log(GDP) to carbon intensity in lower-middle-income countries is **33.00 gCO₂/kWh smaller** for each unit increase in log(GDP), but the difference is **not statistically significant**.
+
+-   Compared to low-income countries, the slope is **27.91 gCO₂/kWh smaller** for every one-unit increase in log(GDP). This difference is **not statistically significant**.
+
+-   Compared to low-income countries, the slope is **185.81 gCO₂/kWh more negative** for each unit increase in log(GDP). This is **highly statistically significant**, and it completely reverses the sign of the GDP effect in high-income countries.
+
+    -   In low-income countries, GDP growth **increases** carbon intensity.
+
+    -   In high-income countries, GDP growth **decreases** carbon intensity.
+
+    This suggests that wealthy countries decarbonize as they grow, whereas poorer countries carbonize as they grow.
+
+The reversal of the GDP effect between low and high-income countries indicates fundamentally different development pathways. Low-income countries appear to rely more heavily on coal, diesel, and other fossil fuels when expanding electricity access, causing carbon intensity to rise as GDP increases. High-income countries, however, may already have built or transitioned toward cleaner electricity systems, so additional economic growth is associated with investments in renewable energy, efficiency, and environmental regulations. As a result, high-income countries show declining carbon intensity as GDP increases, which suggests decarbonization, while low-income countries show increasing carbon intensity, reflecting carbonization during early development.
+
+Model Assessment/Diagnostics
+
+-   Linearity: The Residuals vs Fitted plot does not show any major curvature so the linearity assumption is reasonable.
+
+-   Normality: The Q-Q plot shows slight deviation at the tail ends but is overall reasonable, so the normality of residuals assumption is not violated.
+
+-   Homoskedasticity: The Residuals vs Fitted plot shows moderate heteroskedasticity indicated via a fan shape in the residuals.
+
+-   Influential Observations: The residuals leverage plot does not show any observations with concerningly high Cook's Distance.
