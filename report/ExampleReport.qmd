@@ -1,0 +1,222 @@
+---
+title: "Mental Health Across Time and Stages of Economic Development in Europe"
+author:
+  - "Aesha Gandhi"
+  - "Yiyun (Leo) Yao"
+  - "Junhao Xu"
+  - "Sebine Scaria"
+
+date: "2025-12-03"
+format:
+  pdf:
+    number-sections: true
+    toc: false
+    fig-cap-location: bottom
+execute:
+  echo: false
+  message: false
+  warning: false
+editor: visual
+---
+
+abstract: \| \[Replace this paragraph with your abstract. Summarize the background, data source, methods (ordinal regression & linear regression), key results, and implications in \~150–250 words.\]
+
+```{r}
+#| label: setup
+#| include: false
+
+# Load packages
+library(tidyverse)
+library(broom)
+library(knitr)
+
+# (Optional) set global theme for ggplot
+theme_set(theme_bw())
+
+# TODO: Load your real dataset here
+# data <- read_csv("your-data.csv")
+```
+
+## Introduction
+
+\[Mental health background and motivation. Cite prevalence, economic burden, and prior work on suicide and macroeconomic factors. End by stating the main research questions.\]
+
+## Methods
+
+### Data and Preprocessing
+
+\[Describe the data source, time range, number of observations and variables, inclusion/exclusion criteria, handling of missing data, and any derived variables such as suicide-rate groups and GDP groups.\]
+
+```{r}
+#| label: tbl-summary-data
+#| tbl-cap: "Characteristics of European States Included"
+
+# Placeholder summary table
+summary_tbl <- tibble(
+  `Suicide Rate` = c("Median", "1st Quartile", "3rd Quartile", "Mean"),
+  `Value`        = c("12.28", "7.33", "17.78", "13.87")
+)
+
+kable(summary_tbl, align = c("l", "r"))
+```
+
+### Variable Selection
+
+\[Describe a priori variable selection, exploratory data analysis (scatterplots, boxplots), and rationale for including interactions.\]
+
+### Model Fitting and Evaluation
+
+\[Explain the ordinal regression for suicide-rate groups and multiple linear regression for MRDP. Mention AIC, proportional-odds test, VIF, residual plots, Cook’s Distance, confusion matrix, and R-squared.\]
+
+## Results
+
+### Overview of Included Data
+
+\[Summarize the final analytic sample: number of rows, proportion in each GDP group and suicide-rate group, distribution across decades, and missingness.\]
+
+### Research Question 1: Contributing Factors of Suicide Rate
+
+\[Text summary of the ordinal regression results, interpretation of key coefficients and interaction terms, proportional-odds check, and model accuracy.\]
+
+```{r}
+#| label: tbl-ord-reg
+#| tbl-cap: "Ordinal Regression Model Summary"
+
+# Placeholder coefficient table
+ord_tbl <- tribble(
+  ~Variable,                            ~Estimate, ~`Std Error`, ~`t-value`, ~`p-value`,
+  "Youth Unemployment",                 "0.03",    "0.01",       "2.46",     "0.01",
+  "GDP Group (Low)",                    "1.04",    "0.39",       "2.67",     "0.03",
+  "Number of Hospitals",                "-2.33e-4","1.08e-4",    "-2.15",    "0.03",
+  "HDI",                                "2.84",    "0.22",       "13.19",    "<0.001",
+  "Available Produce",                  "-0.01",   "0.001",      "-9.78",    "<0.001",
+  "Youth Unemployment * GDP Group",     "-0.039",  "0.02",       "-2.17",    "0.03"
+)
+
+kable(ord_tbl, align = "lrrrr")
+```
+
+```{r}
+#| label: fig-youth-unemp
+#| fig-cap: "Youth Unemployment by Suicide Rate Groups for High and Low GDP."
+
+# Placeholder plot structure; replace with real data/variables
+set.seed(1)
+plot_df <- tibble(
+  suicide_group = factor(rep(c("Low","Medium","High"), each = 100),
+                         levels = c("Low","Medium","High")),
+  youth_unemp   = c(rnorm(100, 15, 5), rnorm(100, 20, 6), rnorm(100, 25, 7)),
+  gdp_group     = factor(rep(rep(c("High GDP","Low GDP"), each = 50), 3))
+)
+
+ggplot(plot_df, aes(x = suicide_group, y = youth_unemp, colour = gdp_group)) +
+  geom_boxplot(alpha = 0.4, position = position_dodge(width = 0.8)) +
+  labs(x = "Suicide Rate Groups", y = "Youth Unemployment Rate")
+```
+
+\[Interpretation paragraph explaining how the figure supports the model results.\]
+
+```{r}
+#| label: fig-hospitals
+#| fig-cap: "Number of Hospitals by Suicide Rate Groups for GDP Group."
+
+# Placeholder data and plot
+hosp_df <- tibble(
+  suicide_group = factor(rep(c("Low","Medium","High"), each = 100),
+                         levels = c("Low","Medium","High")),
+  hospitals     = c(rpois(100, 400), rpois(100, 600), rpois(100, 500)),
+  gdp_group     = factor(rep(rep(c("High GDP","Low GDP"), each = 50), 3))
+)
+
+ggplot(hosp_df, aes(x = suicide_group, y = hospitals, colour = gdp_group)) +
+  geom_boxplot(alpha = 0.4, position = position_dodge(width = 0.8)) +
+  labs(x = "Suicide Rate Groups", y = "Number of Hospitals")
+```
+
+### Research Question 2: Contributing Factors of Mental-Related Disorder Prevalence (MRDP)
+
+\[Describe the exploratory plots, variable relationships, and motivation for including interactions between year group and unemployment rate.\]
+
+```{r}
+#| label: fig-mrdp-predictors
+#| fig-cap: "Effects of variables associated with MRDP."
+
+# Placeholder multi-panel plot structure
+mrdp_df <- tibble(
+  mrdp          = runif(300, 0, 150),
+  gdp_pc        = runif(300, 0, 100),
+  inflation     = runif(300, 0, 9000),
+  fat_avail     = runif(300, 50, 150),
+  unemp_rate    = runif(300, 0, 40)
+)
+
+ggplot(mrdp_df, aes(gdp_pc, mrdp)) +
+  geom_point() +
+  labs(x = "Nominal GDP per Capita", y = "MRDP")
+```
+
+\[You can create separate chunks/figures for each small panel as in the original report, or use `patchwork`/`facet_wrap`.\]
+
+```{r}
+#| label: fig-unemp-year
+#| fig-cap: "Interaction between Unemployment Rate and Year Group."
+
+# Placeholder interaction plot
+int_df <- tibble(
+  mrdp          = runif(300, 0, 150),
+  unemp_rate    = runif(300, 0, 40),
+  YearGroup     = factor(rep(c("1990's","2000's","2010's"), each = 100))
+)
+
+ggplot(int_df, aes(unemp_rate, mrdp, colour = YearGroup)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Unemployment Rate", y = "MRDP")
+```
+
+```{r}
+#| label: fig-cooks
+#| fig-cap: "Influential points measured by Cook's distance."
+
+# Placeholder Cook's distance plot
+cooks_df <- tibble(
+  index  = 1:1000,
+  cooksd = rexp(1000, rate = 20)
+)
+
+ggplot(cooks_df, aes(index, cooksd)) +
+  geom_point() +
+  labs(x = "Index", y = "cooksd")
+```
+
+```{r}
+#| label: tbl-mlr-mrdp
+#| tbl-cap: "MRDP Multiple Linear Regression Summary Table"
+
+# Placeholder regression summary table
+mlr_tbl <- tribble(
+  ~Characteristic,                          ~Beta,   ~SE,    ~`95% CI`,          ~`p-value`,
+  "Unemployment Rate (%)",                  "-0.039","0.129","-0.292, 0.215",    "0.766",
+  "Fat Availability (g/person/day)",        "0.112", "0.021","0.070, 0.153",    "<0.001",
+  "Inflation Rate (%)",                     "0.000", "0.001","-0.002, 0.002",   "0.902",
+  "GDP per capita (thousand USD)",         "0.280", "0.030","0.222, 0.338",    "<0.001",
+  "YearGroup: 2000's (vs 1990's)",          "3.361", "2.040","-0.640, 7.363",   "0.100",
+  "YearGroup: 2010's (vs 1990's)",          "13.02", "2.150","8.799, 17.24",    "<0.001",
+  "Unemp Rate * 2000's (vs 1990's)",        "-0.269","0.188","-0.639, 0.100",   "0.153",
+  "Unemp Rate * 2010's (vs 1990's)",        "-0.711","0.190","-1.085, -0.338",  "<0.001"
+)
+
+kable(mlr_tbl, align = "lrrrr")
+```
+
+\[Interpretation paragraph about the sign and significance of coefficients, model fit (adjusted (R\^2)), and any assumption checks.\]
+
+## Conclusion
+
+\[Summarize the main findings for suicide rates and MRDP, discuss policy implications, limitations (missing data, outliers, measurement issues), and directions for future research.\]
+
+## References
+
+1.  \[Replace with real WHO HFA-DB reference\]
+2.  \[Replace with global cost of mental illness reference\]
+3.  \[Add the rest of your bibliography manually, or switch to using a BibTeX file and Pandoc citations.\]
